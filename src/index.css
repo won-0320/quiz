@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic',
+    system-ui, sans-serif;
+}
+
+/*
+ * base 레이어에 넣어야 한다. 레이어 밖에 두면 레이어 안에 있는 Tailwind 유틸리티보다
+ * 우선순위가 높아져서, 버튼/입력에 붙인 text-5xl 같은 글자 크기 클래스가 전부 무시된다.
+ */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--color-slate-100);
+    color: var(--color-slate-900);
+    -webkit-font-smoothing: antialiased;
+    /* 모바일에서 가로 스크롤이 절대 생기지 않도록 */
+    overflow-x: hidden;
+  }
+
+  /* iOS는 16px 미만 입력란을 탭하면 화면을 확대한다. 크기를 지정하지 않은 폼 요소의 기본값만 올린다. */
+  input,
+  textarea,
+  select,
+  button {
+    font-size: 16px;
+  }
+}
