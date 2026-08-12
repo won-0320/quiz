@@ -28,6 +28,8 @@ export default function TakeQuizPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<AttemptResult | null>(null)
+  /** AI가 실제로 주관식을 채점했는지. false면 교사 채점을 기다리는 상태다. */
+  const [aiGraded, setAiGraded] = useState(false)
   const pollRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -85,7 +87,13 @@ export default function TakeQuizPage() {
 
     if (r.grading_status === 'pending') {
       // 주관식 채점 요청 (실패해도 객관식 점수는 이미 확정되어 있다)
-      void supabase.functions.invoke('grade-short-answers', { body: { attempt_id: r.attempt_id } })
+      void supabase.functions
+        .invoke('grade-short-answers', { body: { attempt_id: r.attempt_id } })
+        .then(({ data }) => {
+          // mock === false 일 때만 AI가 실제로 매긴 점수다. 호출이 실패하면 교사 채점
+          // 대기로 남겨 둔다 — 확정되지 않은 점수를 최종 점수처럼 보여주지 않기 위해서다.
+          setAiGraded((data as { mock?: boolean } | null)?.mock === false)
+        })
       pollResult(r.attempt_id)
     }
   }
@@ -144,26 +152,40 @@ export default function TakeQuizPage() {
   if (stage === 'done' && result) {
     const percent = result.max_score > 0 ? Math.round((result.score / result.max_score) * 100) : 0
     const pending = result.grading_status === 'pending'
+    const shortCount = quiz.questions.filter((q) => q.type === 'short').length
+    // AI 채점을 쓰지 않으면 주관식은 0점인 채로 남는다. 그 상태의 총점·환산점수는
+    // 최종 점수가 아니므로, 객관식 점수라고 밝히고 환산점수는 감춘다.
+    const teacherWillGrade = shortCount > 0 && !aiGraded
     return (
       <div className="flex min-h-full items-center justify-center px-4 py-10">
         <div className="w-full max-w-sm text-center">
-          <div className="text-4xl">{pending ? '⏳' : percent >= 80 ? '🎉' : '📘'}</div>
+          <div className="text-4xl">
+            {pending ? '⏳' : teacherWillGrade ? '📘' : percent >= 80 ? '🎉' : '📘'}
+          </div>
           <h1 className="mt-3 text-xl font-bold">제출 완료!</h1>
           <p className="mt-1 text-sm text-slate-500">{name}</p>
 
           <Card className="mt-5">
-            <p className="text-sm text-slate-500">점수</p>
+            <p className="text-sm text-slate-500">{teacherWillGrade ? '객관식 점수' : '점수'}</p>
             <p className="mt-1 text-5xl font-black text-indigo-600 tabular-nums">
               {Number(result.score)}
               <span className="text-2xl text-slate-400"> / {Number(result.max_score)}</span>
             </p>
-            <p className="mt-1 text-sm text-slate-500">100점 만점 환산 {percent}점</p>
+            {!teacherWillGrade && (
+              <p className="mt-1 text-sm text-slate-500">100점 만점 환산 {percent}점</p>
+            )}
 
-            {pending && (
+            {pending ? (
               <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700">
                 <Spinner className="h-4 w-4" />
                 주관식을 채점하고 있습니다…
               </div>
+            ) : (
+              teacherWillGrade && (
+                <div className="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700">
+                  주관식 {shortCount}문항은 선생님이 채점합니다.
+                </div>
+              )
             )}
           </Card>
 

@@ -8,10 +8,14 @@ import { readFunctionError } from '../lib/fnError'
 
 const MAX_BYTES = 20 * 1024 * 1024
 
+/** 직접 출제는 문항을 손으로 쓰고, AI 생성은 PDF를 읽혀서 만든다. */
+type Mode = 'manual' | 'ai'
+
 export default function NewQuizPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
 
+  const [mode, setMode] = useState<Mode>('manual')
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [mcqCount, setMcqCount] = useState(5)
@@ -19,7 +23,7 @@ export default function NewQuizPage() {
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [instructions, setInstructions] = useState('')
   const [error, setError] = useState('')
-  const [step, setStep] = useState<'' | 'uploading' | 'generating'>('')
+  const [step, setStep] = useState<'' | 'creating' | 'uploading' | 'generating'>('')
 
   const busy = step !== ''
   const total = mcqCount + shortCount
@@ -42,8 +46,40 @@ export default function NewQuizPage() {
     if (!title.trim()) setTitle(f.name.replace(/\.pdf$/i, ''))
   }
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault()
+  /** 직접 출제 — 빈 퀴즈만 만들고 바로 문항 편집 화면으로 넘긴다. */
+  async function createManual() {
+    if (!user) return
+    if (!title.trim()) {
+      setError('퀴즈 제목을 입력해 주세요.')
+      return
+    }
+
+    setError('')
+    setStep('creating')
+
+    const { data: quiz, error: insErr } = await supabase
+      .from('quiz_quizzes')
+      .insert({
+        teacher_id: user.id,
+        title: title.trim(),
+        status: 'draft',
+        mcq_count: 0,
+        short_count: 0,
+      })
+      .select()
+      .single()
+
+    if (insErr || !quiz) {
+      setStep('')
+      setError(insErr?.message ?? '퀴즈를 만들지 못했습니다.')
+      return
+    }
+
+    navigate(`/quiz/${quiz.id}/review`, { replace: true })
+  }
+
+  /** PDF 업로드 후 AI에게 문항 생성을 맡긴다. */
+  async function createWithAi() {
     if (!file || !user) return
     if (total < 1) {
       setError('문항을 1개 이상 만들어야 합니다.')
@@ -118,6 +154,11 @@ export default function NewQuizPage() {
     navigate(`/quiz/${quiz.id}/review`, { replace: true })
   }
 
+  function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    void (mode === 'manual' ? createManual() : createWithAi())
+  }
+
   return (
     <Page
       title="새 퀴즈 만들기"
@@ -129,36 +170,68 @@ export default function NewQuizPage() {
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <Card>
-          <span className="mb-1.5 block text-sm font-medium text-slate-700">수업 자료 (PDF)</span>
-          <label
-            className={`flex min-h-32 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors ${
-              file ? 'border-indigo-300 bg-indigo-50' : 'border-slate-300 hover:bg-slate-50'
-            }`}
-          >
-            <input
-              type="file"
-              accept="application/pdf,.pdf"
-              className="hidden"
-              disabled={busy}
-              onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-            />
-            {file ? (
-              <>
-                <span className="text-2xl">📄</span>
-                <span className="text-sm font-medium break-all text-slate-800">{file.name}</span>
-                <span className="text-xs text-slate-500">
-                  {(file.size / 1024 / 1024).toFixed(1)}MB · 다시 누르면 변경
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="text-2xl">⬆️</span>
-                <span className="text-sm font-medium text-slate-700">PDF 파일 선택</span>
-                <span className="text-xs text-slate-500">최대 20MB</span>
-              </>
-            )}
-          </label>
+          <span className="mb-1.5 block text-sm font-medium text-slate-700">출제 방식</span>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                { value: 'manual', label: '직접 출제', hint: '문항을 직접 씁니다' },
+                { value: 'ai', label: 'PDF로 AI 생성', hint: '자료를 읽혀 만듭니다' },
+              ] as const
+            ).map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setMode(m.value)
+                  setError('')
+                }}
+                className={`min-h-16 rounded-xl border px-3 py-2 text-center transition-colors ${
+                  mode === m.value
+                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span className="block text-sm font-medium">{m.label}</span>
+                <span className="mt-0.5 block text-xs opacity-70">{m.hint}</span>
+              </button>
+            ))}
+          </div>
         </Card>
+
+        {mode === 'ai' && (
+          <Card>
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">수업 자료 (PDF)</span>
+            <label
+              className={`flex min-h-32 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors ${
+                file ? 'border-indigo-300 bg-indigo-50' : 'border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                disabled={busy}
+                onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+              />
+              {file ? (
+                <>
+                  <span className="text-2xl">📄</span>
+                  <span className="text-sm font-medium break-all text-slate-800">{file.name}</span>
+                  <span className="text-xs text-slate-500">
+                    {(file.size / 1024 / 1024).toFixed(1)}MB · 다시 누르면 변경
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl">⬆️</span>
+                  <span className="text-sm font-medium text-slate-700">PDF 파일 선택</span>
+                  <span className="text-xs text-slate-500">최대 20MB</span>
+                </>
+              )}
+            </label>
+          </Card>
+        )}
 
         <Card className="space-y-4">
           <Input
@@ -169,63 +242,86 @@ export default function NewQuizPage() {
             placeholder="예: 3단원 광합성"
           />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="객관식 개수"
-              type="number"
-              min={0}
-              max={30}
-              value={mcqCount}
-              disabled={busy}
-              onChange={(e) => setMcqCount(Math.max(0, Number(e.target.value) || 0))}
-            />
-            <Input
-              label="주관식 개수"
-              type="number"
-              min={0}
-              max={30}
-              value={shortCount}
-              disabled={busy}
-              onChange={(e) => setShortCount(Math.max(0, Number(e.target.value) || 0))}
-            />
-          </div>
-          <p className="-mt-2 text-xs text-slate-500">총 {total}문항</p>
-
-          <div>
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">난이도</span>
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.keys(DIFFICULTY_LABEL) as Difficulty[]).map((d) => (
-                <button
-                  key={d}
-                  type="button"
+          {mode === 'ai' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="객관식 개수"
+                  type="number"
+                  min={0}
+                  max={30}
+                  value={mcqCount}
                   disabled={busy}
-                  onClick={() => setDifficulty(d)}
-                  className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
-                    difficulty === d
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {DIFFICULTY_LABEL[d]}
-                </button>
-              ))}
-            </div>
-          </div>
+                  onChange={(e) => setMcqCount(Math.max(0, Number(e.target.value) || 0))}
+                />
+                <Input
+                  label="주관식 개수"
+                  type="number"
+                  min={0}
+                  max={30}
+                  value={shortCount}
+                  disabled={busy}
+                  onChange={(e) => setShortCount(Math.max(0, Number(e.target.value) || 0))}
+                />
+              </div>
+              <p className="-mt-2 text-xs text-slate-500">총 {total}문항</p>
 
-          <Textarea
-            label="추가 요청 (선택)"
-            rows={2}
-            value={instructions}
-            disabled={busy}
-            onChange={(e) => setInstructions(e.target.value)}
-            placeholder="예: 계산 문제 위주로, 3~5쪽 내용만"
-          />
+              <div>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">난이도</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(DIFFICULTY_LABEL) as Difficulty[]).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setDifficulty(d)}
+                      className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                        difficulty === d
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {DIFFICULTY_LABEL[d]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <Textarea
+                label="추가 요청 (선택)"
+                rows={2}
+                value={instructions}
+                disabled={busy}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="예: 계산 문제 위주로, 3~5쪽 내용만"
+              />
+            </>
+          )}
+
+          {mode === 'manual' && (
+            <p className="-mt-1 text-xs text-slate-500">
+              다음 화면에서 객관식·주관식 문항을 직접 추가하고 정답과 배점을 정합니다.
+            </p>
+          )}
         </Card>
 
         {error && <ErrorBox>{error}</ErrorBox>}
 
-        <Button type="submit" full loading={busy} disabled={!file}>
-          {step === 'uploading' ? 'PDF 올리는 중…' : step === 'generating' ? '문항 만드는 중…' : '문항 만들기'}
+        <Button
+          type="submit"
+          full
+          loading={busy}
+          disabled={mode === 'manual' ? !title.trim() : !file}
+        >
+          {mode === 'manual'
+            ? step === 'creating'
+              ? '만드는 중…'
+              : '문항 작성하러 가기'
+            : step === 'uploading'
+              ? 'PDF 올리는 중…'
+              : step === 'generating'
+                ? '문항 만드는 중…'
+                : '문항 만들기'}
         </Button>
 
         {step === 'generating' && (

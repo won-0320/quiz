@@ -4,7 +4,7 @@
 // 남용 방지: grading_status 가 'pending' 인 응시만 채점하고, 끝나면 항상 'done' 으로
 // 바꾼다. 따라서 같은 attempt_id 로 반복 호출해도 AI를 두 번 부르지 않는다.
 //
-// ANTHROPIC_API_KEY 가 없거나 MOCK_AI=true 이면 키워드 일치로 대신 채점한다.
+// ANTHROPIC_API_KEY 가 없거나 MOCK_AI=true 이면 0점으로 두고 교사 채점에 맡긴다.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -97,22 +97,17 @@ interface Item {
 }
 
 /**
- * AI 키가 없을 때 쓰는 임시 채점. 한국어는 조사가 붙어 단순 키워드 비교가 잘 맞지 않으므로,
- * 맞다/틀리다를 흉내내지 않고 "답을 썼는지"만 보고 절반 점수를 준 뒤 교사에게 넘긴다.
- * (정답을 오답으로 확정해 버리는 것보다 낫다.)
+ * AI 키가 없을 때. 맞다/틀리다를 흉내내지 않고 0점으로 남겨 교사에게 넘긴다.
+ * 임의로 부분점수를 주면 학생이 그것을 최종 점수로 오해하므로 점수는 건드리지 않는다.
+ * (graded_by 를 null 로 두어 교사 화면에서 "채점 대기"로 구분된다.)
  */
 function mockGrade(items: Item[]): GradeItem[] {
-  return items.map((it) => {
-    const answered = it.response.trim().length > 0
-    return {
-      index: it.index,
-      verdict: answered ? 'partial' : 'incorrect',
-      ratio: answered ? 0.5 : 0,
-      reason: answered
-        ? 'AI 채점 키가 설정되지 않아 임시로 절반 점수를 주었습니다. 교사 채점이 필요합니다.'
-        : '무응답',
-    }
-  })
+  return items.map((it) => ({
+    index: it.index,
+    verdict: 'incorrect' as const,
+    ratio: 0,
+    reason: it.response.trim().length > 0 ? '선생님이 채점할 예정입니다.' : '무응답',
+  }))
 }
 
 async function gradeWithClaude(apiKey: string, items: Item[]): Promise<GradeItem[]> {

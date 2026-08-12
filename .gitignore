@@ -33,3 +33,4 @@ dist-ssr
 
 # scripts/make-sample-pdf.mjs 가 만드는 테스트용 PDF
 sample.pdf
+.vercel

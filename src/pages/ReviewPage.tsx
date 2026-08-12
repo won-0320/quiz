@@ -113,7 +113,7 @@ export default function ReviewPage() {
         if (q.correct_choice == null || q.correct_choice < 0 || q.correct_choice >= choices.length)
           return `${n}번 문항의 정답을 선택하세요.`
       } else if (!q.model_answer?.trim()) {
-        return `${n}번 문항의 모범답안이 비어 있습니다. AI 채점의 기준이 됩니다.`
+        return `${n}번 문항의 모범답안이 비어 있습니다. 채점할 때 기준이 됩니다.`
       }
     }
     return null
@@ -245,6 +245,9 @@ export default function ReviewPage() {
     )
   }
 
+  // PDF를 올려 만든 퀴즈만 AI 재생성을 제안한다 (직접 출제엔 읽을 자료가 없다).
+  const hasSource = Boolean(quiz.source_path)
+
   return (
     <Page
       title={quiz.title}
@@ -265,9 +268,12 @@ export default function ReviewPage() {
       {questions.length === 0 ? (
         <Card className="space-y-3 py-10 text-center">
           <p className="font-medium text-slate-700">아직 문항이 없습니다.</p>
-          <Button onClick={regenerate} loading={regenerating}>
-            AI로 다시 만들기
-          </Button>
+          <p className="text-sm text-slate-500">아래 버튼으로 문항을 추가하세요.</p>
+          {hasSource && (
+            <Button onClick={regenerate} loading={regenerating}>
+              AI로 다시 만들기
+            </Button>
+          )}
         </Card>
       ) : (
         <ul className="space-y-3">
@@ -295,7 +301,8 @@ export default function ReviewPage() {
         </Button>
       </div>
 
-      {questions.length > 0 && (
+      {/* PDF가 없는 퀴즈(직접 출제)에서는 숨긴다 — 누르면 손으로 쓴 문항이 전부 덮어써진다. */}
+      {hasSource && questions.length > 0 && (
         <div className="mt-2">
           <Button variant="ghost" full onClick={regenerate} loading={regenerating}>
             AI로 전체 다시 만들기
@@ -450,7 +457,7 @@ function QuestionCard({
             rows={2}
             value={q.model_answer ?? ''}
             onChange={(e) => onChange({ model_answer: e.target.value })}
-            hint="AI가 이 답안과 비교해 채점합니다."
+            hint="채점할 때 기준이 됩니다. AI 채점을 켜면 이 답안과 비교합니다."
           />
           <Input
             label="채점 기준 (선택)"
