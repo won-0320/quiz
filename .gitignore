@@ -24,8 +24,9 @@ dist-ssr
 *.sw?
 
 # 환경변수 (Supabase URL/키)
-.env.local
-.env*.local
+.env
+.env.*
+!.env.example
 
 # Playwright MCP 산출물
 .playwright-mcp/
