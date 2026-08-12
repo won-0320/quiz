@@ -157,7 +157,7 @@ export default function TakeQuizPage() {
               {Number(result.score)}
               <span className="text-2xl text-slate-400"> / {Number(result.max_score)}</span>
             </p>
-            <p className="mt-1 text-sm text-slate-500">{percent}점 만점 환산</p>
+            <p className="mt-1 text-sm text-slate-500">100점 만점 환산 {percent}점</p>
 
             {pending && (
               <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700">

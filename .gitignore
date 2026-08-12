@@ -30,3 +30,6 @@ dist-ssr
 
 # Playwright MCP 산출물
 .playwright-mcp/
+
+# scripts/make-sample-pdf.mjs 가 만드는 테스트용 PDF
+sample.pdf
