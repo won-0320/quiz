@@ -29,6 +29,7 @@ npm run dev        # http://localhost:5173
 | 학생 화면 | `src/pages/{Join,TakeQuiz}Page.tsx` | 로그인 불필요 |
 | 문항 생성 | `supabase/functions/generate-quiz/` | PDF → Claude API → 문항 |
 | 주관식 채점 | `supabase/functions/grade-short-answers/` | 답안 → Claude API → 점수·사유 |
+| DB 스키마 | `supabase/migrations/0001_quiz_schema.sql` | 테이블·RLS·RPC·스토리지 버킷 전체 |
 
 DB는 기존 Supabase 프로젝트(`won-0320's Project`) 안에 `quiz_` 접두사 테이블 4개
 (`quiz_quizzes`, `quiz_questions`, `quiz_attempts`, `quiz_answers`)로 들어 있습니다.
@@ -64,6 +65,22 @@ supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 
 사용 모델은 `claude-opus-5` 이며, 문항 생성은 `effort: medium`, 채점은 `effort: low` 입니다.
 문항 구조와 채점 결과는 프롬프트가 아니라 **JSON Schema(구조화 출력)** 로 강제합니다.
+
+## 빈 Supabase 프로젝트에 새로 설치하기
+
+1. SQL Editor 에서 `supabase/migrations/0001_quiz_schema.sql` 실행
+   (테이블 4개, RLS 정책, RPC 6개, 트리거, `quiz-pdfs` 버킷이 한 번에 만들어집니다)
+2. Edge Function 두 개 배포 — `supabase functions deploy generate-quiz grade-short-answers`
+3. 시크릿 설정 — `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...`
+4. `.env.local` 에 새 프로젝트의 URL 과 **legacy anon 키(JWT)** 기입 (`.env.example` 의 주의사항 참고)
+5. 아래 "교사 계정" 절차대로 계정 생성
+
+## 배포
+
+`vercel.json` 의 리라이트 규칙이 있어야 학생이 QR 로 여는 `/j/{코드}` 주소가
+정적 호스팅에서 404 가 나지 않습니다. Vercel 프로젝트 환경변수에
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` 를 반드시 등록하세요 —
+Vite 는 빌드 시점에 값을 굽기 때문에 빠뜨리면 흰 화면이 됩니다.
 
 ## 교사 계정
 
