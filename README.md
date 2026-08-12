@@ -31,9 +31,9 @@ npm run dev        # http://localhost:5173
 | 주관식 채점 | `supabase/functions/grade-short-answers/` | 답안 → Claude API → 점수·사유 |
 | DB 스키마 | `supabase/migrations/0001_quiz_schema.sql` | 테이블·RLS·RPC·스토리지 버킷 전체 |
 
-DB는 기존 Supabase 프로젝트(`won-0320's Project`) 안에 `quiz_` 접두사 테이블 4개
-(`quiz_quizzes`, `quiz_questions`, `quiz_attempts`, `quiz_answers`)로 들어 있습니다.
-기존 테이블과는 완전히 분리되어 있습니다.
+DB는 Supabase 프로젝트(`won1234's Project`, ref `esmawsytnyimshmgjxjf`) 안에
+`quiz_` 접두사 테이블 4개(`quiz_quizzes`, `quiz_questions`, `quiz_attempts`, `quiz_answers`)로
+들어 있습니다. 접두사를 쓰므로 같은 프로젝트의 다른 테이블과 섞이지 않습니다.
 
 ## 보안 설계
 
@@ -84,9 +84,16 @@ Vite 는 빌드 시점에 값을 굽기 때문에 빠뜨리면 흰 화면이 됩
 
 ## 교사 계정
 
-이 Supabase 프로젝트는 직접 회원가입이 막혀 있습니다. 계정은 대시보드에서 만듭니다:
+계정은 대시보드에서 만듭니다:
 
 Authentication → Users → **Add user** → Create new user → **Auto Confirm User** 체크
+
+앱에 회원가입 화면은 없지만, **공개 회원가입은 반드시 대시보드에서 꺼야 합니다.**
+켜져 있으면 누구나 `/auth/v1/signup` 을 직접 호출해 교사 계정을 만들고 문항 생성
+(= Anthropic API 비용)을 쓸 수 있습니다. RLS 가 `teacher_id` 로 막아 주므로 남의 퀴즈나
+답안이 보이지는 않지만, 자원 남용은 막지 못합니다.
+
+Authentication → Sign In / Providers → Email → **Allow new users to sign up** 끄기
 
 ## 알려진 제약
 

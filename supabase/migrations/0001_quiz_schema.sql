@@ -357,6 +357,9 @@ grant execute on function public.quiz_publish(uuid) to authenticated;
 -- 코드 생성기는 quiz_publish 내부에서만 쓰인다. 외부 노출 금지.
 revoke all on function public.quiz_generate_join_code() from public, anon, authenticated;
 
+-- 트리거 전용 함수도 마찬가지로 REST 에 노출될 이유가 없다.
+revoke all on function public.quiz_recalc_attempt_score() from public, anon, authenticated;
+
 -- ============================================================
 -- 스토리지 — 비공개 버킷. 경로는 {교사 uid}/{퀴즈 id}.pdf
 -- ============================================================
